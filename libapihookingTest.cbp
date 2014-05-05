@@ -38,10 +38,9 @@
 			<Add directory="include" />
 		</Compiler>
 		<Linker>
-			<Add library="SDL2" />
-			<Add library="GL" />
 			<Add library="apihooking" />
 			<Add library="disasm" />
+			<Add library="apihookingTestLib" />
 		</Linker>
 		<Unit filename="test/main.c">
 			<Option compilerVar="CC" />

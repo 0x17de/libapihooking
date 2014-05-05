@@ -2,6 +2,7 @@
 #include <SDL2/SDL.h>
 #include <GL/gl.h>
 
+extern int testLibFunction(int par1, int par2, int par3, int par4);
 #include "libapihooking.h"
 
 static int running = 1;
@@ -11,17 +12,31 @@ static void sigint()
     running = 0;
 }
 
-void myRenderHook()
+void myHook(int par1, int par2, int par3, int par4)
 {
-    printf("myhook\n");
-    fflush(stdout);
-    glColor3f(0.0f, 1.0f, 0.0f);
-    glBegin(GL_TRIANGLES);
-    glVertex3f(-1.0f, 0.0f, 0.0f);
-    glVertex3f(0.0f, 0.0f, 0.0f);
-    glVertex3f(-0.5f, 1.0f, 0.0f);
-    glEnd();
     __asm__("nop");
+
+
+    __asm__("push %rbp");
+    __asm__("mov %rsp, %rbp");
+    // __asm__("add %rsp, 0x20");
+
+    /*int a = 3;
+    printf("mycall: %d %d %d %d\n", par1, par2, par3, par4);
+    a += 2;
+    if (a == 2)
+    {
+        a = 3;
+    }
+    else
+    {
+        a = 4;
+    }*/
+
+    // __asm__("sub %rsp, 0x20");
+    __asm__("mov %rbp, %rsp");
+    __asm__("pop %rbp");
+
     __asm__("nop");
     __asm__("nop");
     __asm__("nop");
@@ -41,44 +56,20 @@ void myRenderHook()
 int main()
 {
     signal(SIGINT, sigint);
-    SDL_Init(SDL_INIT_VIDEO);
 
-    SDL_Window* window = SDL_CreateWindow("test", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 800, 600, SDL_WINDOW_OPENGL);
-    SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, 0);
+    testLibFunction(1, 2, 3, 4);
 
     ApiHook_init();
-    ApiHook_unprotect(myRenderHook);
-    ApiHook_unprotect(SDL_RenderPresent);
-    ApiHook_hookFunction(myRenderHook, SDL_RenderPresent);
-    ApiHook_printFunction(myRenderHook);
+    ApiHook_unprotect(myHook);
+    ApiHook_unprotect(testLibFunction);
+    ApiHook_hookFunction(myHook, testLibFunction);
+    ApiHook_printFunction(myHook);
     ApiHook_cleanup();
 
-    SDL_Event event;
-    while(running)
+    for(int i = 0; i < 4; ++i)
     {
-        SDL_PollEvent(&event);
-        if (event.type == SDL_KEYDOWN)
-            if (event.key.keysym.sym == SDLK_ESCAPE)
-                running = 0;
-        glMatrixMode(GL_PROJECTION);
-        glLoadIdentity();
-        glMatrixMode(GL_MODELVIEW);
-        glLoadIdentity();
-        glClear(GL_COLOR_BUFFER_BIT);
-        glColor3f(1.0f, 0.0f, 1.0f);
-        glBegin(GL_LINES);
-        glVertex3f(0.0f, 0.0f, 0.0f);
-        glVertex3f(1.0f, 0.0f, 0.0f);
-        glEnd();
-
-        printf("RenderLoop\n");
-        fflush(stdout);
-        SDL_RenderPresent(renderer);
+        testLibFunction(1, 2, 3, 4);
     }
 
-    SDL_DestroyRenderer(renderer);
-    SDL_DestroyWindow(window);
-
-    SDL_Quit();
     return 0;
 }

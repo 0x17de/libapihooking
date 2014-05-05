@@ -104,47 +104,46 @@ int ApiHook_copyInstructions(char* from, int minByteCount, char* dst)
 
 void ApiHook_hookFunction(void* myFunction, void* otherFunction)
 {
-	char* startOfFunction = ((char*)otherFunction + 4); // TODO: don't use magic numbers, look for mov ebp, esp
-	char* endOfMyFunction = (char*)myFunction + ApiHook_findFirstNop(myFunction);
+	char* startOfMyFunction = (char*)myFunction + ApiHook_findFirstNop(myFunction) + 1;
+	char* endOfMyFunction = startOfMyFunction + ApiHook_findFirstNop(startOfMyFunction);
 
 	// cleanup stack
-	endOfMyFunction[0] = 0x5D; // pop ebp
-	endOfMyFunction += 1; // move forward
+	//endOfMyFunction[0] = 0xC9; // 0x5D (pop ebp), 0xC9 (leave)
+	//endOfMyFunction += 1; // move forward
 
 	x86_insn_t insn;
 	ApiHook_disasm(otherFunction, 0, &insn);
 
 	char line[200];
 	ApiHook_asmToString(&insn, line, 200);
-	printf("Original %s\n", line);
+	printf("Original %s | ", line);
+	for(int i = 0; i < insn.size; ++i)
+        printf("%02X", ((char*)otherFunction)[i] & 0xFF);
+	printf("\n");
 
 	if (insn.type == insn_jmp)
 	{
         // jump back to original code
-        memcpy(endOfMyFunction, otherFunction, insn.size);
-        int* startOfJumpToOrig = (int*)(endOfMyFunction + 2);
-        *startOfJumpToOrig += endOfMyFunction - startOfFunction; // @TODO: verify
+        endOfMyFunction[0] = 0xE9;
+        int32_t* startOfJumpToOrig = (int32_t*)(endOfMyFunction + 1);
+        startOfJumpToOrig[0] = (int32_t)(ApiHook_calcJump(endOfMyFunction, otherFunction) + 6);
+
+        /* int32_t* offset = (int32_t*)((char*)otherFunction + 2);
+        endOfMyFunction[0] = 0xE9;
+        int32_t* startOfJumpToOrig = (int32_t*)(endOfMyFunction + 1);
+        startOfJumpToOrig[0] = (int32_t)(ApiHook_calcJump(endOfMyFunction, otherFunction + offset[0]) + 6); */
 
         // nop the old area
         memset(otherFunction, 0x90, insn.size);
         // jump from original to own function
         ((char*)otherFunction)[0] = 0xE9;
         int* startOfJump = (int*)((char*)otherFunction + 1);
-        startOfJump[0] = ApiHook_calcJump((char*)otherFunction, myFunction);
-
-        ApiHook_disasm(otherFunction, 0, &insn);
-        ApiHook_asmToString(&insn, line, 200);
-        printf("newOtherFunc: %s\n", line);
-        fflush(stdout);
-
-        ApiHook_disasm(endOfMyFunction, 0, &insn);
-        ApiHook_asmToString(&insn, line, 200);
-
-        printf("JumpBack: %s\n", line);
-        fflush(stdout);
+        startOfJump[0] = ApiHook_calcJump((char*)otherFunction, startOfMyFunction);
 	}
 	else
     {
+        char* startOfFunction = ((char*)otherFunction + 4); // TODO: don't use magic numbers, look for mov ebp, esp
+
         // backup original code in own function
         int sizeOfCopiedInstructions = ApiHook_copyInstructions(startOfFunction, 5, endOfMyFunction);
         printf("Size of copied instructions: %d\n", sizeOfCopiedInstructions);
